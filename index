@@ -1,0 +1,1858 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#f5f1e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
+<title>5K · De cero a cinco</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,800;1,400;1,800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+  :root{
+    --bg:#f5f1e8;          /* crema suave */
+    --bg-2:#ede7d8;        /* crema más cálida */
+    --bg-3:#e2dac5;        /* crema acento */
+    --ink:#2e2e2e;         /* tinta grafito */
+    --ink-dim:#8a8577;     /* gris cálido */
+    --accent:#b96e4e;      /* terracota suave */
+    --warm:#c8a876;        /* beige dorado apagado */
+    --walk:#7a9b7c;        /* verde salvia (andar) */
+    --run:#b96e4e;         /* terracota (correr) */
+    --warmup:#c8a876;      /* dorado apagado (calentar) */
+    --ok:#6b8e6f;          /* verde salvia oscuro (ok) */
+    --line:rgba(46,46,46,.08);
+    --line-2:rgba(46,46,46,.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+  html,body{height:100%;overflow-x:hidden}
+  body{
+    font-family:'Fraunces',Georgia,serif;
+    background:var(--bg);
+    color:var(--ink);
+    min-height:100vh;
+    padding-bottom:100px;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(185,110,78,.08), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgba(122,155,124,.08), transparent 60%);
+  }
+  .noise{
+    position:fixed;inset:0;pointer-events:none;opacity:.025;z-index:1;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* HEADER */
+  header{
+    padding:22px 20px 14px;
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:1px solid var(--line);
+    position:relative;z-index:2;
+  }
+  .brand{display:flex;flex-direction:column;gap:2px}
+  .brand .mark{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;letter-spacing:.25em;
+    color:var(--ink-dim);text-transform:uppercase;
+  }
+  .brand h1{
+    font-family:'Fraunces',serif;
+    font-weight:800;font-size:26px;line-height:1;
+    font-style:italic;letter-spacing:-.02em;
+  }
+  .brand h1 .five{color:var(--accent);font-style:normal}
+  .hdr-right{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;color:var(--ink-dim);text-align:right;line-height:1.6;
+  }
+  .hdr-right b{color:var(--ink);font-weight:600}
+
+  /* TABS */
+  nav.tabs{
+    position:fixed;bottom:0;left:0;right:0;z-index:50;
+    background:rgba(245,241,232,.92);backdrop-filter:blur(20px);
+    -webkit-backdrop-filter:blur(20px);
+    border-top:1px solid var(--line-2);
+    display:grid;grid-template-columns:repeat(4,1fr);
+    padding:10px 6px calc(10px + env(safe-area-inset-bottom));
+  }
+  nav.tabs button{
+    background:none;border:0;color:var(--ink-dim);
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    letter-spacing:.15em;text-transform:uppercase;
+    padding:8px 4px;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:5px;
+    transition:color .2s;
+  }
+  nav.tabs button.active{color:var(--accent)}
+  nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.5}
+
+  /* VIEWS */
+  main{padding:20px;position:relative;z-index:2}
+  .view{display:none;animation:fadein .3s ease}
+  .view.active{display:block}
+  @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* HOY */
+  .today-card{
+    background:linear-gradient(155deg,#faf6ec 0%,#ede7d8 100%);
+    border:1px solid var(--line-2);
+    border-radius:22px;
+    padding:24px 22px;
+    position:relative;overflow:hidden;
+    box-shadow:0 2px 16px rgba(46,46,46,.04);
+  }
+  .today-card::before{
+    content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;
+    background:radial-gradient(circle,var(--accent) 0%,transparent 70%);
+    opacity:.1;pointer-events:none;
+  }
+  .week-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;letter-spacing:.25em;color:var(--warm);
+    text-transform:uppercase;position:relative;
+  }
+  .today-card h2{
+    font-size:30px;font-weight:800;line-height:1.05;margin:8px 0 4px;
+    letter-spacing:-.02em;position:relative;
+  }
+  .today-card h2 em{color:var(--accent);font-style:italic}
+  .today-card .subtitle{color:var(--ink-dim);font-size:14px;font-style:italic;margin-bottom:18px;position:relative;line-height:1.4}
+  .today-stats{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0 20px;
+    padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    position:relative;
+  }
+  .stat{text-align:center}
+  .stat .val{font-size:22px;font-weight:600;color:var(--ink);display:block;line-height:1;font-family:'JetBrains Mono',monospace}
+  .stat .lbl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.18em;color:var(--ink-dim);text-transform:uppercase;margin-top:7px;display:block}
+
+  .segments{display:flex;gap:1px;height:12px;border-radius:6px;overflow:hidden;margin-bottom:8px;position:relative}
+  .seg{height:100%;transition:opacity .2s}
+  .seg.warmup{background:var(--warmup)}
+  .seg.walk{background:var(--walk)}
+  .seg.run{background:var(--run)}
+  .seg.cooldown{background:var(--warmup);opacity:.75}
+  .seg-legend{display:flex;gap:14px;font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--ink-dim);letter-spacing:.12em;text-transform:uppercase;position:relative;flex-wrap:wrap}
+  .seg-legend span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .seg-legend .l-warm::before{background:var(--warmup)}
+  .seg-legend .l-walk::before{background:var(--walk)}
+  .seg-legend .l-run::before{background:var(--run)}
+
+  .start-btn{
+    display:block;width:100%;margin-top:22px;
+    background:var(--accent);color:#faf6ec;
+    border:0;padding:18px;border-radius:14px;
+    font-family:'Fraunces',serif;font-weight:800;font-size:16px;
+    cursor:pointer;
+    text-transform:uppercase;letter-spacing:.18em;
+    transition:transform .15s;
+    box-shadow:0 6px 18px rgba(185,110,78,.2);position:relative;
+  }
+  .start-btn:active{transform:scale(.98)}
+  .start-btn.done{background:var(--ok);pointer-events:none;box-shadow:0 6px 18px rgba(107,142,111,.2)}
+  .manual-btn{
+    display:block;width:100%;margin-top:10px;
+    background:transparent;color:var(--ink-dim);
+    border:1px solid var(--line-2);padding:13px;border-radius:14px;
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+    letter-spacing:.18em;text-transform:uppercase;cursor:pointer;
+    transition:color .2s,border-color .2s;position:relative;
+  }
+  .manual-btn:active{background:rgba(46,46,46,.04)}
+  .manual-btn.done{display:none}
+
+  .tips{
+    margin-top:22px;padding:16px 18px;
+    border-left:2px solid var(--warm);
+    background:rgba(244,184,96,.05);border-radius:0 10px 10px 0;
+  }
+  .tips h4{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.25em;color:var(--warm);text-transform:uppercase;margin-bottom:8px}
+  .tips p{font-size:14px;line-height:1.55;color:var(--ink-dim)}
+  .tips p em{color:var(--ink);font-style:italic}
+
+  /* PLAN */
+  .plan-header{margin-bottom:18px}
+  .plan-header h2{font-size:28px;font-weight:800;font-style:italic;letter-spacing:-.02em}
+  .plan-header p{color:var(--ink-dim);font-size:14px;margin-top:4px;line-height:1.5}
+
+  .phase{margin-bottom:26px}
+  .phase-title{
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    letter-spacing:.22em;color:var(--warm);text-transform:uppercase;
+    margin-bottom:10px;display:flex;align-items:center;gap:10px;
+  }
+  .phase-title::after{content:'';flex:1;height:1px;background:var(--line)}
+
+  .week-row{
+    display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;
+    padding:14px;border:1px solid var(--line);border-radius:12px;
+    margin-bottom:8px;cursor:pointer;transition:border-color .2s,background .2s;
+    background:rgba(255,255,255,.01);
+  }
+  .week-row:active{background:rgba(255,255,255,.03)}
+  .week-row.current{border-color:var(--accent);background:rgba(255,87,51,.05)}
+  .week-row.done{opacity:.5}
+  .week-num{
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+    background:var(--bg-2);padding:6px 10px;border-radius:6px;
+    min-width:54px;text-align:center;letter-spacing:.08em;
+  }
+  .week-row.current .week-num{background:var(--accent);color:#faf6ec;font-weight:600}
+  .week-desc{font-size:14px;line-height:1.35}
+  .week-desc b{font-weight:600}
+  .week-desc .mini{color:var(--ink-dim);font-size:11px;display:block;margin-top:3px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em}
+  .week-status{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-dim);letter-spacing:.08em}
+  .week-status.done{color:var(--ok)}
+
+  /* HISTORIAL */
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px}
+  .stat-card{
+    background:var(--bg-2);border:1px solid var(--line);
+    padding:16px;border-radius:14px;
+  }
+  .stat-card .big{font-size:28px;font-weight:800;font-style:italic;color:var(--ink);line-height:1;font-family:'Fraunces',serif}
+  .stat-card .big.acc{color:var(--accent)}
+  .stat-card .big.ok{color:var(--ok)}
+  .stat-card .lbl{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.2em;color:var(--ink-dim);margin-top:7px;text-transform:uppercase}
+
+  .chart-wrap{
+    background:var(--bg-2);border:1px solid var(--line);
+    padding:18px;border-radius:14px;margin-bottom:20px;
+  }
+  .chart-wrap h3{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.25em;color:var(--ink-dim);text-transform:uppercase;margin-bottom:14px}
+  .chart-wrap canvas{max-height:220px}
+
+  .sessions-title{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.25em;color:var(--ink-dim);text-transform:uppercase;margin:0 0 10px}
+  .session-row{
+    display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;
+    padding:12px 0;border-bottom:1px solid var(--line);
+  }
+  .session-row.clickable{cursor:pointer;transition:background .15s;margin:0 -10px;padding:12px 10px;border-radius:8px}
+  .session-row.clickable:active{background:rgba(185,110,78,.06)}
+  .session-row:last-child{border-bottom:0}
+  .map-badge{
+    display:inline-block;margin-left:6px;
+    font-family:'JetBrains Mono',monospace;font-size:9px;
+    letter-spacing:.15em;text-transform:uppercase;
+    color:var(--accent);padding:2px 6px;border-radius:4px;
+    background:rgba(185,110,78,.1);
+  }
+  .manual-badge{
+    display:inline-block;margin-left:6px;
+    font-family:'JetBrains Mono',monospace;font-size:9px;
+    letter-spacing:.15em;text-transform:uppercase;
+    color:var(--ink-dim);padding:2px 6px;border-radius:4px;
+    background:rgba(46,46,46,.07);
+  }
+  .sess-date{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-dim);min-width:60px;line-height:1.4}
+  .sess-date b{display:block;color:var(--ink);font-size:13px}
+  .sess-detail{font-size:14px}
+  .sess-detail .mini{font-size:11px;color:var(--ink-dim);display:block;margin-top:2px;font-family:'JetBrains Mono',monospace}
+  .sess-time{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--ok);font-weight:600}
+
+  .empty{
+    text-align:center;padding:50px 20px;color:var(--ink-dim);
+    font-style:italic;font-size:15px;line-height:1.5;
+  }
+
+  /* AJUSTES */
+  .settings-sect{margin-bottom:30px}
+  .settings-sect h3{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.25em;color:var(--warm);text-transform:uppercase;margin-bottom:8px}
+  .settings-row{
+    display:flex;justify-content:space-between;align-items:center;gap:16px;
+    padding:16px 0;border-bottom:1px solid var(--line);
+  }
+  .settings-row .lbl{font-size:14px;flex:1}
+  .settings-row .lbl .mini{display:block;color:var(--ink-dim);font-size:12px;margin-top:3px;font-style:italic}
+  .switch{
+    position:relative;width:46px;height:26px;
+    background:var(--bg-2);border:1px solid var(--line-2);border-radius:14px;
+    cursor:pointer;transition:background .2s;flex-shrink:0;
+  }
+  .switch::after{
+    content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;
+    background:var(--ink-dim);border-radius:50%;transition:.2s;
+  }
+  .switch.on{background:var(--accent);border-color:var(--accent)}
+  .switch.on::after{left:22px;background:#faf6ec}
+  .mini-btn{
+    padding:8px 14px;border-radius:8px;border:1px solid var(--line-2);
+    background:transparent;color:var(--ink);cursor:pointer;
+    font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;
+  }
+  .mini-btn:active{transform:scale(.97)}
+  .select-row{display:flex;gap:6px;padding:0 0 16px;border-bottom:1px solid var(--line);margin-bottom:0}
+  .select-row button{
+    flex:1;padding:10px;border:1px solid var(--line-2);
+    background:transparent;color:var(--ink-dim);border-radius:8px;
+    font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;cursor:pointer;
+  }
+  .select-row button.active{background:var(--accent);color:#faf6ec;border-color:var(--accent);font-weight:600}
+  .danger-btn{
+    width:100%;margin-top:14px;padding:14px;
+    background:transparent;color:#b85450;
+    border:1px solid rgba(184,84,80,.3);border-radius:10px;
+    font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;
+    text-transform:uppercase;cursor:pointer;
+  }
+  .info-box{
+    background:rgba(122,155,124,.08);border-left:2px solid var(--walk);
+    padding:14px 16px;border-radius:0 10px 10px 0;font-size:13px;
+    line-height:1.55;color:var(--ink-dim);margin-bottom:12px;
+  }
+  .info-box b{color:var(--ink)}
+
+  /* ENTRENO ACTIVO */
+  .workout-overlay{
+    position:fixed;inset:0;z-index:100;
+    background:var(--bg);
+    display:none;flex-direction:column;
+    padding:30px 24px calc(24px + env(safe-area-inset-bottom));
+  }
+  .workout-overlay.active{display:flex}
+  .workout-overlay .w-top{
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .w-week{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;color:var(--ink-dim);text-transform:uppercase}
+  .w-close{
+    background:none;border:1px solid var(--line-2);color:var(--ink);
+    width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;line-height:1;
+  }
+  .w-phase{
+    font-family:'Fraunces',serif;font-weight:800;font-style:italic;
+    font-size:52px;letter-spacing:-.03em;line-height:1;margin-top:22px;
+    transition:color .3s;
+  }
+  .w-phase.walking{color:var(--walk)}
+  .w-phase.running{color:var(--run)}
+  .w-phase.warmup{color:var(--warmup)}
+  .w-phase.cooldown{color:var(--walk)}
+  .w-phase.done{color:var(--ok)}
+  .w-instruction{font-size:15px;color:var(--ink-dim);margin-top:6px;font-style:italic}
+  .w-ring{
+    flex:1;display:flex;align-items:center;justify-content:center;
+    position:relative;margin:14px 0;
+  }
+  .w-ring svg{width:100%;max-width:270px;height:auto;transform:rotate(-90deg)}
+  .w-ring .ring-track{fill:none;stroke:var(--line);stroke-width:8}
+  .w-ring .ring-progress{fill:none;stroke:var(--accent);stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1s linear,stroke .3s}
+  .w-ring.walking .ring-progress{stroke:var(--walk)}
+  .w-ring.running .ring-progress{stroke:var(--run)}
+  .w-ring.warmup .ring-progress{stroke:var(--warmup)}
+  .w-ring.cooldown .ring-progress{stroke:var(--warmup)}
+  .w-ring .time{
+    position:absolute;text-align:center;
+  }
+  .w-ring .time .big{
+    font-family:'JetBrains Mono',monospace;font-size:56px;font-weight:500;
+    letter-spacing:-.02em;line-height:1;
+  }
+  .w-ring .time .lbl{
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    letter-spacing:.25em;color:var(--ink-dim);text-transform:uppercase;
+    margin-top:10px;
+  }
+  .w-total{
+    text-align:center;font-family:'JetBrains Mono',monospace;
+    font-size:12px;color:var(--ink-dim);margin-bottom:12px;letter-spacing:.15em;
+  }
+  .w-total b{color:var(--ink);font-weight:600}
+  .w-progress{
+    height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:20px;
+  }
+  .w-gps{
+    display:grid;grid-template-columns:1fr 1fr;gap:14px;
+    background:rgba(122,155,124,.08);border:1px solid var(--line);
+    border-radius:12px;padding:12px;margin-bottom:14px;
+  }
+  .w-gps-item{text-align:center}
+  .w-gps-item .val{
+    display:block;font-family:'JetBrains Mono',monospace;
+    font-size:22px;font-weight:600;color:var(--ok);line-height:1;
+  }
+  .w-gps-item .lbl{
+    display:block;font-family:'JetBrains Mono',monospace;
+    font-size:9px;letter-spacing:.22em;color:var(--ink-dim);
+    text-transform:uppercase;margin-top:6px;
+  }
+  .w-map{
+    height:180px;border-radius:12px;overflow:hidden;margin-bottom:14px;
+    border:1px solid var(--line);background:var(--bg-2);
+  }
+  #w-map{width:100%;height:100%}
+  .route-map{
+    height:320px;border-radius:12px;overflow:hidden;
+    border:1px solid var(--line);background:var(--bg-2);
+  }
+  #mr-map{width:100%;height:100%}
+  /* Los tiles OSM son algo saturados; desaturamos un pelín para integrarlos con la paleta crema */
+  .leaflet-tile{
+    filter:saturate(.75) contrast(.95) brightness(1.02);
+  }
+  /* Esconder el atribución de Leaflet si estorba en el mini-mapa */
+  .w-map .leaflet-control-attribution{font-size:8px;opacity:.7}
+  .route-map .leaflet-control-attribution{font-size:9px}
+  .w-progress-bar{height:100%;background:var(--accent);transition:width .5s linear;width:0%}
+  .w-controls{display:grid;grid-template-columns:1fr 1.3fr 1fr;gap:10px}
+  .w-controls button{
+    padding:16px 10px;border-radius:12px;border:1px solid var(--line-2);
+    background:var(--bg-2);color:var(--ink);cursor:pointer;
+    font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  }
+  .w-controls .primary{
+    background:var(--accent);color:#faf6ec;border-color:var(--accent);font-weight:600;
+  }
+  .w-controls button:active{transform:scale(.97)}
+
+  /* MODAL */
+  .modal{
+    position:fixed;inset:0;background:rgba(46,46,46,.45);z-index:200;
+    display:none;align-items:flex-end;backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px);
+  }
+  .modal.active{display:flex}
+  .modal-card{
+    width:100%;background:var(--bg-2);
+    border-radius:22px 22px 0 0;padding:28px 24px calc(28px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line-2);
+    animation:slideup .3s ease;
+  }
+  @keyframes slideup{from{transform:translateY(100%)}to{transform:none}}
+  .modal-card h3{font-size:24px;font-weight:800;font-style:italic;margin-bottom:6px}
+  .modal-card p{color:var(--ink-dim);font-size:14px;margin-bottom:20px;line-height:1.5}
+  .modal-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+  .modal-stats .stat{background:var(--bg);padding:14px;border-radius:10px;text-align:left}
+  .modal-stats .stat .val{font-size:18px;text-align:left}
+  .modal-stats .stat .lbl{font-size:9px;text-align:left}
+  .modal-btns{display:grid;grid-template-columns:1fr;gap:10px}
+  .modal-btns.two{grid-template-columns:1fr 1fr}
+  .modal-btns button{
+    padding:14px;border-radius:10px;cursor:pointer;
+    font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.15em;text-transform:uppercase;
+  }
+  .btn-save{background:var(--ok);color:#faf6ec;border:0;font-weight:600}
+  .btn-cancel{background:transparent;color:var(--ink-dim);border:1px solid var(--line-2)}
+
+  /* El botón rojo de terminar en el modal stop */
+  #modal-stop .btn-save{background:#b85450;color:#faf6ec;border:0;font-weight:600}
+
+  @media (max-width:360px){
+    .today-card h2{font-size:25px}
+    .stat .val{font-size:18px}
+    .w-phase{font-size:42px}
+    .w-ring .time .big{font-size:46px}
+    .plan-header h2{font-size:24px}
+  }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<header>
+  <div class="brand">
+    <span class="mark">Plan 00 · semana <span id="h-week">1</span></span>
+    <h1>De cero a <span class="five">5K</span></h1>
+  </div>
+  <div class="hdr-right">
+    <div>12 semanas</div>
+    <div>3 días / semana</div>
+    <div><b id="h-progress">0%</b> completado</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- HOY -->
+  <section class="view active" id="view-today">
+    <div class="today-card">
+      <div class="week-tag" id="today-week">Semana 1 · Sesión 1</div>
+      <h2 id="today-title">Primer <em>arranque</em></h2>
+      <div class="subtitle" id="today-sub">6 series de 1' corriendo suave + 2' andando</div>
+
+      <div class="today-stats">
+        <div class="stat">
+          <span class="val" id="today-total">28'</span>
+          <span class="lbl">Duración</span>
+        </div>
+        <div class="stat">
+          <span class="val" id="today-run">6'</span>
+          <span class="lbl">Corriendo</span>
+        </div>
+        <div class="stat">
+          <span class="val" id="today-reps">6×</span>
+          <span class="lbl">Series</span>
+        </div>
+      </div>
+
+      <div class="segments" id="today-segments"></div>
+      <div class="seg-legend">
+        <span class="l-warm">Calentar</span>
+        <span class="l-walk">Andar</span>
+        <span class="l-run">Correr</span>
+      </div>
+
+      <button class="start-btn" id="btn-start">Empezar sesión</button>
+      <button class="manual-btn" id="btn-manual" onclick="markManualDone()">Ya la hice · marcar como completada</button>
+    </div>
+
+    <div class="tips">
+      <h4>Consejo del día</h4>
+      <p id="tip-text"><em>Corre muy despacio.</em> Si no puedes hablar mientras corres, vas demasiado rápido. En estas primeras semanas no buscamos velocidad: buscamos que tu corazón y articulaciones se adapten sin lesión.</p>
+    </div>
+  </section>
+
+  <!-- PLAN -->
+  <section class="view" id="view-plan">
+    <div class="plan-header">
+      <h2>El plan completo</h2>
+      <p>12 semanas, progresión conservadora basada en el NHS Couch-to-5K adaptado a mayores de 50 con baja forma. Cada sesión empieza con <em>5' andando (calentamiento)</em> y termina con <em>5' andando (vuelta a la calma)</em>.</p>
+    </div>
+    <div id="plan-list"></div>
+  </section>
+
+  <!-- PROGRESO -->
+  <section class="view" id="view-progress">
+    <div class="plan-header">
+      <h2>Tu progreso</h2>
+      <p>Sesiones completadas, tiempos y evolución.</p>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="big acc" id="st-sessions">0</div>
+        <div class="lbl">Sesiones hechas</div>
+      </div>
+      <div class="stat-card">
+        <div class="big ok" id="st-totaltime">0'</div>
+        <div class="lbl">Tiempo total</div>
+      </div>
+      <div class="stat-card">
+        <div class="big" id="st-running">0'</div>
+        <div class="lbl">Minutos corriendo</div>
+      </div>
+      <div class="stat-card">
+        <div class="big" id="st-km">—</div>
+        <div class="lbl">Kilómetros totales</div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <h3>Minutos corriendo por sesión</h3>
+      <canvas id="chartRun"></canvas>
+    </div>
+
+    <h3 class="sessions-title">Últimas sesiones</h3>
+    <div id="sessions-list"></div>
+  </section>
+
+  <!-- AJUSTES -->
+  <section class="view" id="view-settings">
+    <div class="plan-header">
+      <h2>Ajustes</h2>
+      <p>Voz, avisos y gestión de datos.</p>
+    </div>
+
+    <div class="settings-sect">
+      <h3>Avisos</h3>
+      <div class="settings-row">
+        <div class="lbl">Modo de aviso <span class="mini">Voz habla / pitidos cortos / los dos</span></div>
+      </div>
+      <div class="select-row" id="mode-select">
+        <button data-mode="voice">Voz</button>
+        <button data-mode="beep">Pitidos</button>
+        <button data-mode="both">Ambos</button>
+      </div>
+
+      <div class="settings-row">
+        <div class="lbl">Bajar música al hablar <span class="mini">Usa "audio ducking" del móvil</span></div>
+        <div class="switch on" id="sw-duck"></div>
+      </div>
+      <div class="settings-row">
+        <div class="lbl">Aviso previo (10s) <span class="mini">"Prepárate, vamos a correr"</span></div>
+        <div class="switch on" id="sw-warn"></div>
+      </div>
+      <div class="settings-row">
+        <div class="lbl">Vibración <span class="mini">Al cambiar de fase</span></div>
+        <div class="switch on" id="sw-vibe"></div>
+      </div>
+      <div class="settings-row">
+        <div class="lbl">Probar aviso <span class="mini">Escucha cómo sonará</span></div>
+        <button class="mini-btn" onclick="testVoice()">Probar</button>
+      </div>
+      <div class="info-box" style="margin-top:14px">
+        <b>Spotify u otra música puesta.</b> Si pones música antes de entrenar, la app intenta bajarle el volumen justo cuando habla (ducking). Si se siguen solapando en tu móvil, cambia a modo <b>Pitidos</b>: son más cortos y se oyen bien por encima de la música. Clave: 1 pitido = andar · 2 pitidos = correr · 3 pitidos = vuelta a la calma.
+      </div>
+    </div>
+
+    <div class="settings-sect">
+      <h3>GPS · kilómetros</h3>
+      <div class="settings-row">
+        <div class="lbl">Activar GPS durante la sesión <span class="mini">Registra distancia y ritmo min/km</span></div>
+        <div class="switch" id="sw-gps"></div>
+      </div>
+      <div class="info-box">
+        <b>Recomendaciones.</b> Al activar GPS, el móvil te pedirá permiso de ubicación — acéptalo. La <b>primera vez puede tardar 30-60 segundos</b> en fijar bien la señal, sobre todo bajo árboles o entre edificios altos. Consume más batería (≈10-15% en una hora). Si solo quieres controlar tiempo, déjalo apagado.
+      </div>
+    </div>
+
+    <div class="settings-sect">
+      <h3>Datos</h3>
+      <div class="info-box">
+        <b>Todo se guarda en tu móvil.</b> Los datos no salen del dispositivo. Si borras los datos del navegador o reinstalas, perderás el historial. Exporta cuando quieras.
+      </div>
+      <div class="settings-row">
+        <div class="lbl">Exportar sesiones <span class="mini">Descarga un archivo JSON</span></div>
+        <button class="mini-btn" onclick="exportData()">Exportar</button>
+      </div>
+      <div class="settings-row">
+        <div class="lbl">Avanzar semana manual <span class="mini">Saltar a la siguiente</span></div>
+        <button class="mini-btn" onclick="advanceWeek()">Avanzar</button>
+      </div>
+      <div class="settings-row">
+        <div class="lbl">Retroceder semana <span class="mini">Si la actual cuesta mucho</span></div>
+        <button class="mini-btn" onclick="previousWeek()">Retroceder</button>
+      </div>
+      <button class="danger-btn" onclick="resetAll()">Reiniciar todo el progreso</button>
+    </div>
+
+    <div class="settings-sect">
+      <h3>Sobre este plan</h3>
+      <div class="info-box">
+        Plan adaptado a adulto de ~50 años, sedentario, con condición cardiovascular baja. Basado en el NHS Couch-to-5K pero extendido a 12 semanas con progresión más gradual. 3 sesiones por semana con al menos 1 día de descanso entre cada una. Si una semana cuesta, repítela antes de avanzar — no hay prisa.
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- TABS -->
+<nav class="tabs">
+  <button class="active" data-view="today">
+    <svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
+    Hoy
+  </button>
+  <button data-view="plan">
+    <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    Plan
+  </button>
+  <button data-view="progress">
+    <svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l4-4 4 4 5-5"/></svg>
+    Progreso
+  </button>
+  <button data-view="settings">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6m11-11h-6M7 12H1m17-7l-4 4m-4 10l-4 4m0-14L3 5m10 14l4 4"/></svg>
+    Ajustes
+  </button>
+</nav>
+
+<!-- OVERLAY ENTRENO -->
+<div class="workout-overlay" id="workout">
+  <div class="w-top">
+    <div class="w-week" id="w-week">Semana 1 · Sesión 1</div>
+    <button class="w-close" onclick="confirmStop()">✕</button>
+  </div>
+  <div class="w-phase warmup" id="w-phase">Calentamiento</div>
+  <div class="w-instruction" id="w-instruction">Camina a paso ligero</div>
+  <div class="w-ring warmup" id="w-ring">
+    <svg viewBox="0 0 200 200">
+      <circle class="ring-track" cx="100" cy="100" r="90"/>
+      <circle class="ring-progress" id="ring-prog" cx="100" cy="100" r="90" stroke-dasharray="565.48" stroke-dashoffset="565.48"/>
+    </svg>
+    <div class="time">
+      <div class="big" id="w-time">5:00</div>
+      <div class="lbl" id="w-seglabel">Esta fase</div>
+    </div>
+  </div>
+  <div class="w-total">
+    Total · <b id="w-total">0:00</b> / <span id="w-totalmax">28:00</span> · fase <b id="w-idx">1</b> de <span id="w-total-idx">14</span>
+  </div>
+  <div class="w-gps" id="w-gps" style="display:none">
+    <div class="w-gps-item"><span class="val" id="w-km">0.00</span><span class="lbl">km</span></div>
+    <div class="w-gps-item"><span class="val" id="w-pace">—</span><span class="lbl">min/km</span></div>
+  </div>
+  <div class="w-map" id="w-map-wrap" style="display:none"><div id="w-map"></div></div>
+  <div class="w-progress"><div class="w-progress-bar" id="w-progbar"></div></div>
+  <div class="w-controls">
+    <button onclick="skipPhase()">Saltar</button>
+    <button class="primary" id="w-pause" onclick="togglePause()">Pausar</button>
+    <button onclick="confirmStop()">Terminar</button>
+  </div>
+</div>
+
+<!-- MODAL FINALIZAR -->
+<div class="modal" id="modal-finish">
+  <div class="modal-card">
+    <h3 id="m-title">¡Sesión completada!</h3>
+    <p id="m-subtitle">Enhorabuena. Ha quedado registrada en tu historial.</p>
+    <div class="modal-stats">
+      <div class="stat"><div class="val" id="m-time">28:00</div><div class="lbl">Duración</div></div>
+      <div class="stat"><div class="val" id="m-run">6:00</div><div class="lbl">Corriendo</div></div>
+      <div class="stat" id="m-km-row" style="display:none;grid-column:1/-1"><div class="val" id="m-km">0.00 km</div><div class="lbl">Distancia</div></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-save" onclick="closeModal('modal-finish')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL STOP -->
+<div class="modal" id="modal-stop">
+  <div class="modal-card">
+    <h3>¿Terminar la sesión?</h3>
+    <p>Si llevas menos de la mitad, no se guardará. Si has hecho más, se guarda como sesión parcial.</p>
+    <div class="modal-btns two">
+      <button class="btn-cancel" onclick="closeModal('modal-stop')">Seguir</button>
+      <button class="btn-save" onclick="endWorkout(true)">Terminar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RUTA HISTORICA -->
+<div class="modal" id="modal-route">
+  <div class="modal-card" style="padding-bottom:calc(16px + env(safe-area-inset-bottom))">
+    <h3 id="mr-title">Ruta de la sesión</h3>
+    <p id="mr-subtitle" style="margin-bottom:14px"></p>
+    <div class="modal-stats" style="margin-bottom:14px">
+      <div class="stat"><div class="val" id="mr-time">0:00</div><div class="lbl">Duración</div></div>
+      <div class="stat"><div class="val" id="mr-km">0 km</div><div class="lbl">Distancia</div></div>
+    </div>
+    <div class="route-map" id="mr-map"></div>
+    <div class="modal-btns" style="margin-top:14px">
+      <button class="btn-cancel" onclick="closeModal('modal-route')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   PLAN 12 semanas - 3 sesiones/sem
+   Cada sesión: 5' calentamiento + bloque + 5' vuelta a la calma
+   Fases: warmup | run | walk | cooldown
+========================================================= */
+const PLAN = [
+  { w:1,  title:"Primer arranque",        sub:"6× (1' correr + 2' andar)",
+    block:[ {t:60,p:'run'},{t:120,p:'walk'},{t:60,p:'run'},{t:120,p:'walk'},
+            {t:60,p:'run'},{t:120,p:'walk'},{t:60,p:'run'},{t:120,p:'walk'},
+            {t:60,p:'run'},{t:120,p:'walk'},{t:60,p:'run'},{t:120,p:'walk'} ],
+    tip:"Corre muy despacio. Si no puedes hablar mientras corres, vas demasiado rápido." },
+
+  { w:2,  title:"Más rodaje",              sub:"7× (1' correr + 2' andar)",
+    block:[ {t:60,p:'run'},{t:120,p:'walk'},{t:60,p:'run'},{t:120,p:'walk'},
+            {t:60,p:'run'},{t:120,p:'walk'},{t:60,p:'run'},{t:120,p:'walk'},
+            {t:60,p:'run'},{t:120,p:'walk'},{t:60,p:'run'},{t:120,p:'walk'},
+            {t:60,p:'run'},{t:120,p:'walk'} ],
+    tip:"Esta semana sumamos una serie más. Mantén el mismo ritmo lento de la semana 1." },
+
+  { w:3,  title:"Estirar el paso",         sub:"6× (1'30\" correr + 2' andar)",
+    block:[ {t:90,p:'run'},{t:120,p:'walk'},{t:90,p:'run'},{t:120,p:'walk'},
+            {t:90,p:'run'},{t:120,p:'walk'},{t:90,p:'run'},{t:120,p:'walk'},
+            {t:90,p:'run'},{t:120,p:'walk'},{t:90,p:'run'},{t:120,p:'walk'} ],
+    tip:"Minuto y medio puede parecer eterno al principio. Respira por la nariz y por la boca." },
+
+  { w:4,  title:"Dos minutos",             sub:"5× (2' correr + 2' andar)",
+    block:[ {t:120,p:'run'},{t:120,p:'walk'},{t:120,p:'run'},{t:120,p:'walk'},
+            {t:120,p:'run'},{t:120,p:'walk'},{t:120,p:'run'},{t:120,p:'walk'},
+            {t:120,p:'run'},{t:120,p:'walk'} ],
+    tip:"Relación 1:1 corriendo/andando. Empieza a notar cómo tu cuerpo se adapta." },
+
+  { w:5,  title:"Tres minutos",            sub:"4× (3' correr + 2' andar)",
+    block:[ {t:180,p:'run'},{t:120,p:'walk'},{t:180,p:'run'},{t:120,p:'walk'},
+            {t:180,p:'run'},{t:120,p:'walk'},{t:180,p:'run'},{t:120,p:'walk'} ],
+    tip:"Primera vez corriendo 3 minutos seguidos. Cuidado con salir rápido — el ritmo se mantiene suave." },
+
+  { w:6,  title:"Bloques de 5",            sub:"3× (5' correr + 2' andar)",
+    block:[ {t:300,p:'run'},{t:120,p:'walk'},{t:300,p:'run'},{t:120,p:'walk'},
+            {t:300,p:'run'},{t:120,p:'walk'} ],
+    tip:"5 minutos es un umbral psicológico. Si aguantas esto, el resto del plan está al alcance." },
+
+  { w:7,  title:"Series largas",           sub:"2× (8' correr + 2' andar)",
+    block:[ {t:480,p:'run'},{t:120,p:'walk'},{t:480,p:'run'},{t:120,p:'walk'} ],
+    tip:"Divide mentalmente los 8 minutos en bloques de 2. Cuenta pasos o respiraciones si te ayuda." },
+
+  { w:8,  title:"Diez minutos",            sub:"2× (10' correr + 2' andar)",
+    block:[ {t:600,p:'run'},{t:120,p:'walk'},{t:600,p:'run'},{t:120,p:'walk'} ],
+    tip:"Ya corres 20 minutos en total. La diferencia con la semana 1 es enorme. Felicítate." },
+
+  { w:9,  title:"Casi continuo",           sub:"12' + 2' andar + 12' correr",
+    block:[ {t:720,p:'run'},{t:120,p:'walk'},{t:720,p:'run'} ],
+    tip:"Último descanso intermedio del plan. La próxima semana empezamos con carrera continua." },
+
+  { w:10, title:"Carrera continua",        sub:"20' corriendo sin parar",
+    block:[ {t:1200,p:'run'} ],
+    tip:"Gran salto mental. Ritmo MUY lento — el objetivo es terminar sin parar, no ir rápido." },
+
+  { w:11, title:"Veinticinco",             sub:"25' corriendo sin parar",
+    block:[ {t:1500,p:'run'} ],
+    tip:"Ya estás a un paso de los 30 minutos. Mantén ritmo conversacional." },
+
+  { w:12, title:"5K",                       sub:"30' corriendo ≈ 5 kilómetros",
+    block:[ {t:1800,p:'run'} ],
+    tip:"El día ha llegado. No hay prisa, solo llegar. En 30 minutos habrás hecho tu primer 5K." },
+];
+
+const WARMUP  = { t:300, p:'warmup' };
+const COOLDOWN= { t:300, p:'cooldown' };
+
+/* Construir segmentos completos */
+function buildSession(weekIdx){
+  const w = PLAN[weekIdx];
+  return [ WARMUP, ...w.block, COOLDOWN ];
+}
+
+function totalTime(segments){ return segments.reduce((a,s)=>a+s.t,0); }
+function runTime(segments){ return segments.filter(s=>s.p==='run').reduce((a,s)=>a+s.t,0); }
+function fmtMin(s){ return Math.round(s/60)+"'"; }
+function fmtTime(s){
+  const m = Math.floor(s/60), sec = s%60;
+  return m + ":" + String(sec).padStart(2,'0');
+}
+
+/* =========================================================
+   ESTADO persistente
+========================================================= */
+const K = 'c25k_state_v1';
+const defaultState = {
+  currentWeek: 0,      // 0-11
+  sessionsInWeek: 0,   // 0,1,2 -> al llegar a 3 avanza semana
+  sessions: [],        // {date, week, session, totalSec, runSec, completed}
+  settings: { mode:'voice', duck:true, warn:true, vibe:true, gps:false }
+};
+let S = loadState();
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(K);
+    if(!raw) return structuredClone(defaultState);
+    const loaded = JSON.parse(raw);
+    const merged = { ...structuredClone(defaultState), ...loaded };
+    // Migración: si viene un 'voice' boolean antiguo en settings, conviértelo
+    merged.settings = { ...defaultState.settings, ...(loaded.settings||{}) };
+    if(typeof loaded.settings?.voice === 'boolean' && !loaded.settings.mode){
+      merged.settings.mode = loaded.settings.voice ? 'voice' : 'beep';
+    }
+    if(!['voice','beep','both'].includes(merged.settings.mode)) merged.settings.mode = 'voice';
+    return merged;
+  }catch(e){ return structuredClone(defaultState); }
+}
+function saveState(){ localStorage.setItem(K, JSON.stringify(S)); }
+
+/* =========================================================
+   AUDIO: voz + pitidos + ducking de música externa
+   Nota sobre el ducking:
+   - En iOS/Android, Web Speech API (TTS) va por un canal
+     distinto al multimedia. Para forzar que Spotify baje el
+     volumen mientras hablamos, reproducimos un pitido (u oscilador)
+     a través del canal de audio "media" justo antes y durante
+     la locución. El sistema operativo aplica "ducking" automático.
+========================================================= */
+let audioCtx = null;
+function getAudioCtx(){
+  if(!audioCtx){
+    try{ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e){ return null; }
+  }
+  if(audioCtx.state === 'suspended'){ audioCtx.resume().catch(()=>{}); }
+  return audioCtx;
+}
+
+/* Pitido único. freq Hz, duración ms, volumen 0-1 */
+function beep(freq=880, durMs=180, vol=0.6){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  // Envelope suave para no "clicar"
+  const t0 = ctx.currentTime;
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(vol, t0+0.015);
+  g.gain.linearRampToValueAtTime(vol, t0 + durMs/1000 - 0.03);
+  g.gain.linearRampToValueAtTime(0, t0 + durMs/1000);
+  osc.connect(g).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + durMs/1000 + 0.01);
+}
+
+/* Reproduce N pitidos separados. Claves:
+   1 = andar (tono medio-grave, verde)
+   2 = correr (tono medio-agudo)
+   3 = vuelta a la calma (descendente) */
+function beepPattern(kind){
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  if(kind === 'walk')       { beep(660, 250, 0.55); }
+  else if(kind === 'run')   { beep(880, 200, 0.6); setTimeout(()=>beep(880,200,0.6), 280); }
+  else if(kind === 'warmup'){ beep(550, 250, 0.55); }
+  else if(kind === 'cooldown'){ beep(700,200,0.55); setTimeout(()=>beep(560,200,0.55),260); setTimeout(()=>beep(440,280,0.55),520); }
+  else if(kind === 'pre')   { beep(1000, 90, 0.4); setTimeout(()=>beep(1000,90,0.4),140); }
+  else if(kind === 'done')  { beep(660,180,0.5); setTimeout(()=>beep(880,180,0.5),200); setTimeout(()=>beep(1100,400,0.5),400); }
+}
+
+/* Ducking: tono silencioso continuo mientras la voz habla,
+   para que el sistema baje Spotify y lo recupere al acabar */
+let duckOsc = null;
+let duckGain = null;
+function startDuck(){
+  if(!S.settings.duck) return;
+  const ctx = getAudioCtx();
+  if(!ctx) return;
+  if(duckOsc) return;
+  try{
+    duckOsc = ctx.createOscillator();
+    duckGain = ctx.createGain();
+    duckOsc.frequency.value = 100;     // tono muy bajo
+    duckGain.gain.value = 0.001;       // prácticamente inaudible, pero el SO lo cuenta como media
+    duckOsc.connect(duckGain).connect(ctx.destination);
+    duckOsc.start();
+  }catch(e){}
+}
+function stopDuck(){
+  if(duckOsc){
+    try{ duckOsc.stop(); duckOsc.disconnect(); duckGain.disconnect(); }catch(e){}
+    duckOsc = null; duckGain = null;
+  }
+}
+
+/* =========================================================
+   VOZ (Web Speech API)
+========================================================= */
+let voicesLoaded = false;
+let esVoice = null;
+function pickVoice(){
+  if(!('speechSynthesis' in window)) return;
+  try{
+    const voices = speechSynthesis.getVoices();
+    if(!voices.length) return;
+    esVoice = voices.find(v=>v.lang==='es-ES') ||
+              voices.find(v=>v.lang.startsWith('es')) ||
+              voices[0];
+    voicesLoaded = true;
+  }catch(e){}
+}
+// Inicializar la voz cuando el DOM esté listo y speechSynthesis disponible
+if(typeof window !== 'undefined'){
+  if('speechSynthesis' in window){
+    pickVoice();
+    try{ speechSynthesis.onvoiceschanged = pickVoice; }catch(e){}
+  }
+}
+
+function speakVoice(text){
+  if(!('speechSynthesis' in window)) return;
+  try{
+    speechSynthesis.cancel();
+    // Activa ducking ANTES de empezar a hablar
+    startDuck();
+    const u = new SpeechSynthesisUtterance(text);
+    if(esVoice) u.voice = esVoice;
+    u.lang = 'es-ES';
+    u.rate = 1.0;
+    u.pitch = 1.0;
+    u.volume = 1.0;
+    u.onend = ()=> setTimeout(stopDuck, 400);  // pequeño margen tras la locución
+    u.onerror = ()=> stopDuck();
+    speechSynthesis.speak(u);
+  }catch(e){ stopDuck(); console.warn(e); }
+}
+
+/* Notifica cambio a una fase. Respeta modo: voz / beep / ambos */
+function notifyPhase(phaseKind, text){
+  const mode = S.settings.mode || 'voice';
+  if(mode === 'beep'){
+    beepPattern(phaseKind);
+  } else if(mode === 'both'){
+    beepPattern(phaseKind);
+    setTimeout(()=> speakVoice(text), 600);
+  } else {
+    speakVoice(text);
+  }
+}
+
+/* Aviso previo (10s antes del cambio) */
+function notifyPre(text){
+  const mode = S.settings.mode || 'voice';
+  if(mode === 'beep'){
+    beepPattern('pre');
+  } else if(mode === 'both'){
+    beepPattern('pre');
+    setTimeout(()=> speakVoice(text), 400);
+  } else {
+    speakVoice(text);
+  }
+}
+
+function testVoice(){
+  const mode = S.settings.mode || 'voice';
+  if(mode === 'beep'){
+    // Demo: andar, correr, vuelta a la calma
+    beepPattern('walk');
+    setTimeout(()=>beepPattern('run'), 900);
+    setTimeout(()=>beepPattern('cooldown'), 2100);
+  } else {
+    speakVoice("Prueba de voz. Ahora a correr. Caminando. Vuelta a la calma.");
+  }
+}
+
+function vibrate(pattern){
+  if(!S.settings.vibe) return;
+  if('vibrate' in navigator){ try{ navigator.vibrate(pattern); }catch(e){} }
+}
+
+/* =========================================================
+   RENDER - HOY
+========================================================= */
+function weekIdx(){ return Math.min(S.currentWeek, PLAN.length-1); }
+
+function renderToday(){
+  const idx = weekIdx();
+  const w = PLAN[idx];
+  const segs = buildSession(idx);
+  const total = totalTime(segs);
+  const run = runTime(segs);
+  const reps = w.block.filter(x=>x.p==='run').length;
+
+  document.getElementById('today-week').textContent =
+    `Semana ${idx+1} · Sesión ${S.sessionsInWeek+1} de 3`;
+  document.getElementById('today-title').innerHTML =
+    w.title.replace(/(\w+)$/, '<em>$1</em>');
+  document.getElementById('today-sub').textContent = w.sub;
+  document.getElementById('today-total').textContent = fmtMin(total);
+  document.getElementById('today-run').textContent = fmtMin(run);
+  document.getElementById('today-reps').textContent = reps+"×";
+  document.getElementById('tip-text').innerHTML =
+    '<em>'+w.tip.split('.')[0]+'.</em> '+w.tip.split('.').slice(1).join('.').trim();
+
+  // Segmentos visuales
+  const segBar = document.getElementById('today-segments');
+  segBar.innerHTML = '';
+  segs.forEach(s=>{
+    const d = document.createElement('div');
+    d.className = 'seg '+s.p;
+    d.style.flex = s.t;
+    segBar.appendChild(d);
+  });
+
+  // Header
+  document.getElementById('h-week').textContent = idx+1;
+  const totalSessions = 12*3;
+  const done = S.sessions.filter(x=>x.completed).length;
+  document.getElementById('h-progress').textContent = Math.round(done/totalSessions*100)+'%';
+
+  // Botones
+  const b = document.getElementById('btn-start');
+  const bm = document.getElementById('btn-manual');
+  b.textContent = 'Empezar sesión';
+  b.classList.remove('done');
+  bm.classList.remove('done');
+  if(idx === PLAN.length-1 && S.sessionsInWeek>=3){
+    b.textContent = '¡Plan completado!';
+    b.classList.add('done');
+    bm.classList.add('done');
+  } else if(S.sessionsInWeek >= 3){
+    // Semana completa, esperando pasar a la siguiente (ya lo habrá hecho automáticamente)
+    bm.classList.add('done');
+  }
+}
+
+/* =========================================================
+   RENDER - PLAN
+========================================================= */
+function renderPlan(){
+  const cont = document.getElementById('plan-list');
+  cont.innerHTML = '';
+  const phases = [
+    { name:'FASE 1 · ADAPTACIÓN', range:[0,3] },
+    { name:'FASE 2 · INTERVALOS', range:[3,6] },
+    { name:'FASE 3 · BLOQUES LARGOS', range:[6,9] },
+    { name:'FASE 4 · CARRERA CONTINUA', range:[9,12] },
+  ];
+  const idx = weekIdx();
+  phases.forEach(ph=>{
+    const div = document.createElement('div');
+    div.className = 'phase';
+    div.innerHTML = `<div class="phase-title">${ph.name}</div>`;
+    for(let i=ph.range[0]; i<ph.range[1]; i++){
+      const w = PLAN[i];
+      const segs = buildSession(i);
+      const isCurrent = i===idx;
+      const isDone = i<idx;
+      const done3 = isCurrent ? S.sessionsInWeek : (isDone ? 3 : 0);
+      const row = document.createElement('div');
+      row.className = 'week-row' + (isCurrent?' current':'') + (isDone?' done':'');
+      row.innerHTML = `
+        <div class="week-num">SEM ${String(i+1).padStart(2,'0')}</div>
+        <div class="week-desc">
+          <b>${w.title}</b><br>${w.sub}
+          <span class="mini">${fmtMin(totalTime(segs))} total · ${fmtMin(runTime(segs))} corriendo</span>
+        </div>
+        <div class="week-status ${isDone?'done':''}">${isDone?'✓':done3+'/3'}</div>
+      `;
+      div.appendChild(row);
+    }
+    cont.appendChild(div);
+  });
+}
+
+/* =========================================================
+   RENDER - PROGRESO
+========================================================= */
+let chartInstance = null;
+function renderProgress(){
+  const sess = S.sessions.filter(x=>x.completed);
+  document.getElementById('st-sessions').textContent = sess.length;
+  const totalSec = sess.reduce((a,s)=>a+s.totalSec,0);
+  const runSec = sess.reduce((a,s)=>a+s.runSec,0);
+  const totalKm = sess.reduce((a,s)=>a+(s.distanceM||0),0)/1000;
+  document.getElementById('st-totaltime').textContent = Math.round(totalSec/60)+"'";
+  document.getElementById('st-running').textContent = Math.round(runSec/60)+"'";
+  const stKm = document.getElementById('st-km');
+  if(stKm) stKm.textContent = totalKm > 0 ? totalKm.toFixed(1) : '—';
+
+  // Chart
+  const ctx = document.getElementById('chartRun');
+  if(chartInstance) chartInstance.destroy();
+  if(sess.length === 0){
+    ctx.style.display = 'none';
+  } else {
+    ctx.style.display = '';
+    chartInstance = new Chart(ctx, {
+      type:'line',
+      data:{
+        labels: sess.map((s,i)=>'S'+(i+1)),
+        datasets:[{
+          label:'Min corriendo',
+          data: sess.map(s=>Math.round(s.runSec/60*10)/10),
+          borderColor:'#b96e4e',
+          backgroundColor:'rgba(185,110,78,.12)',
+          tension:.35, fill:true, borderWidth:2,
+          pointRadius:3, pointBackgroundColor:'#b96e4e'
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false} },
+        scales:{
+          y:{ ticks:{color:'#8a8577',font:{size:10}}, grid:{color:'rgba(46,46,46,.06)'} },
+          x:{ ticks:{color:'#8a8577',font:{size:10}}, grid:{display:false} }
+        }
+      }
+    });
+  }
+
+  // Lista
+  const list = document.getElementById('sessions-list');
+  list.innerHTML = '';
+  if(sess.length === 0){
+    list.innerHTML = '<div class="empty">Aún no hay sesiones. ¡Empieza cuando quieras!</div>';
+    return;
+  }
+  // Recorremos en orden inverso pero guardando el índice real en S.sessions
+  const indexed = S.sessions
+    .map((s,i)=>({s,i}))
+    .filter(x=>x.s.completed)
+    .reverse()
+    .slice(0,10);
+  indexed.forEach(({s, i})=>{
+    const d = new Date(s.date);
+    const day = d.getDate();
+    const mo = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][d.getMonth()];
+    const hasRoute = s.track && s.track.length > 1;
+    const isManual = !!s.manual;
+    const kmTxt = (s.distanceM && s.distanceM > 50) ? ` · ${(s.distanceM/1000).toFixed(2)} km` : '';
+    const mapIcon = hasRoute ? ' <span class="map-badge">ver ruta</span>' : '';
+    const manualIcon = isManual ? ' <span class="manual-badge">manual</span>' : '';
+    const row = document.createElement('div');
+    row.className = 'session-row' + (hasRoute ? ' clickable' : '');
+    row.innerHTML = `
+      <div class="sess-date"><b>${day} ${mo}</b>${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}</div>
+      <div class="sess-detail">Semana ${s.week} · Sesión ${s.session}${mapIcon}${manualIcon}<span class="mini">${PLAN[s.week-1]?.sub || ''}${kmTxt}</span></div>
+      <div class="sess-time">${fmtTime(s.totalSec)}</div>
+    `;
+    if(hasRoute){
+      row.addEventListener('click', ()=> openRouteModal(i));
+    }
+    list.appendChild(row);
+  });
+}
+
+/* =========================================================
+   AJUSTES
+========================================================= */
+function renderSettings(){
+  ['duck','warn','vibe','gps'].forEach(k=>{
+    const sw = document.getElementById('sw-'+k);
+    if(!sw) return;
+    sw.classList.toggle('on', !!S.settings[k]);
+    sw.onclick = ()=>{
+      S.settings[k] = !S.settings[k];
+      sw.classList.toggle('on', S.settings[k]);
+      saveState();
+    };
+  });
+  // Selector de modo
+  const modeBtns = document.querySelectorAll('#mode-select button');
+  modeBtns.forEach(b=>{
+    b.classList.toggle('active', b.dataset.mode === S.settings.mode);
+    b.onclick = ()=>{
+      S.settings.mode = b.dataset.mode;
+      modeBtns.forEach(x=>x.classList.toggle('active', x.dataset.mode === S.settings.mode));
+      saveState();
+    };
+  });
+}
+function exportData(){
+  const blob = new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `c25k_progreso_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function markManualDone(){
+  if(!confirm('¿Marcar la sesión de hoy como completada?\n\nSe registrará sin tiempo ni GPS.')) return;
+  const idx = weekIdx();
+  const segs = buildSession(idx);
+  S.sessions.push({
+    date: new Date().toISOString(),
+    week: idx+1,
+    session: S.sessionsInWeek+1,
+    totalSec: totalTime(segs),   // tiempo teórico de la sesión
+    runSec: runTime(segs),
+    distanceM: 0,
+    track: null,
+    completed: true,
+    manual: true,                // flag para distinguirla en el historial
+  });
+  S.sessionsInWeek++;
+  if(S.sessionsInWeek >= 3 && S.currentWeek < PLAN.length-1){
+    S.currentWeek++;
+    S.sessionsInWeek = 0;
+  } else if(S.sessionsInWeek > 3){
+    S.sessionsInWeek = 3;
+  }
+  saveState();
+  renderAll();
+}
+
+function advanceWeek(){
+  if(S.currentWeek < PLAN.length-1){
+    if(!confirm('¿Avanzar a la semana '+(S.currentWeek+2)+'?')) return;
+    S.currentWeek++;
+    S.sessionsInWeek = 0;
+    saveState(); renderAll();
+  }
+}
+function previousWeek(){
+  if(S.currentWeek > 0){
+    if(!confirm('¿Retroceder a la semana '+(S.currentWeek)+'?')) return;
+    S.currentWeek--;
+    S.sessionsInWeek = 0;
+    saveState(); renderAll();
+  }
+}
+function resetAll(){
+  if(!confirm('¿Borrar TODO el progreso? Esta acción no se puede deshacer.')) return;
+  if(!confirm('Confirma otra vez: ¿seguro que quieres empezar desde cero?')) return;
+  localStorage.removeItem(K);
+  S = structuredClone(defaultState);
+  renderAll();
+}
+
+/* =========================================================
+   ENTRENO ACTIVO
+   Usa timestamps reales (Date.now) en lugar de contar ticks,
+   para que el cronómetro NO se pare al bloquear pantalla o
+   cambiar de app. Cuando la app vuelve al primer plano,
+   recalcula dónde debería estar y avanza fases si es necesario.
+========================================================= */
+let W = null; // sesión activa
+let timerId = null;
+let wakeLock = null;
+let silentAudio = null; // mantiene audio activo en segundo plano
+
+const phaseLabels = {
+  warmup:   { label:'Calentamiento', instr:'Camina a paso ligero', voice:'Empezamos con cinco minutos caminando a paso ligero' },
+  walk:     { label:'Caminar',       instr:'Recupera andando',     voice:'Ahora caminando' },
+  run:      { label:'Correr',        instr:'Carrera suave',        voice:'Ahora a correr, suave' },
+  cooldown: { label:'Vuelta a la calma', instr:'Camina relajado',  voice:'Muy bien. Cinco minutos de vuelta a la calma, caminando' },
+};
+
+/* Mantiene la pestaña "viva" reproduciendo audio silencioso en
+   bucle — truco estándar que usan apps web de fitness/navegación.
+   En iOS en particular esto evita que Safari suspenda la pestaña. */
+function startSilentKeepalive(){
+  try{
+    const ctx = getAudioCtx();
+    if(!ctx) return;
+    if(silentAudio) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.frequency.value = 1;  // 1 Hz, inaudible
+    g.gain.value = 0.0001;    // casi 0
+    osc.connect(g).connect(ctx.destination);
+    osc.start();
+    silentAudio = { osc, g };
+  }catch(e){}
+}
+function stopSilentKeepalive(){
+  if(silentAudio){
+    try{ silentAudio.osc.stop(); silentAudio.osc.disconnect(); silentAudio.g.disconnect(); }catch(e){}
+    silentAudio = null;
+  }
+}
+
+function startWorkout(){
+  const idx = weekIdx();
+  if(idx === PLAN.length-1 && S.sessionsInWeek>=3) return;
+  const segments = buildSession(idx);
+  const now = Date.now();
+  W = {
+    weekIdx: idx,
+    segments,
+    currentSeg: 0,
+    segStartTs: now,        // timestamp real de inicio de la fase actual
+    pausedAt: null,          // si está pausado, timestamp de cuándo
+    pauseAccum: 0,           // ms totales en pausa dentro de la fase actual
+    totalStart: now,         // inicio de toda la sesión
+    totalPauseAccum: 0,      // ms totales en pausa de toda la sesión
+    totalTarget: totalTime(segments),
+    segmentsDone: [],        // duraciones reales completadas (seg) para stats
+    warned: false,
+    paused: false,
+    // GPS
+    gpsActive: !!S.settings.gps,
+    gpsWatchId: null,
+    lastPos: null,
+    distanceM: 0,
+    gpsPoints: 0,
+    gpsTrack: [],        // array de [lat, lon] para dibujar la ruta
+    map: null,
+    mapLine: null,
+    mapMarker: null,
+  };
+  document.getElementById('workout').classList.add('active');
+  document.getElementById('w-week').textContent =
+    `Semana ${idx+1} · Sesión ${S.sessionsInWeek+1}`;
+  document.getElementById('w-totalmax').textContent = fmtTime(W.totalTarget);
+  document.getElementById('w-total-idx').textContent = segments.length;
+
+  // Mostrar u ocultar bloque GPS
+  document.getElementById('w-gps').style.display = W.gpsActive ? 'grid' : 'none';
+  document.getElementById('w-map-wrap').style.display = W.gpsActive ? 'block' : 'none';
+
+  // Mecanismos anti-suspensión
+  requestWakeLock();
+  startSilentKeepalive();
+
+  // GPS si activado
+  if(W.gpsActive){
+    startGPS();
+    initMiniMap();
+  }
+
+  // Anunciar primera fase
+  announcePhase(0, true);
+  updateWorkoutUI();
+
+  // Tick rápido para UI fluida; el tiempo real sale siempre de Date.now()
+  timerId = setInterval(tick, 500);
+}
+
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
+    }
+  }catch(e){}
+}
+function releaseWakeLock(){
+  try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){}
+}
+
+/* Devuelve segundos transcurridos en la fase actual (descontando pausas) */
+function segElapsedSec(){
+  if(!W) return 0;
+  const now = W.paused ? W.pausedAt : Date.now();
+  const ms = now - W.segStartTs - W.pauseAccum;
+  return Math.max(0, Math.floor(ms/1000));
+}
+/* Segundos totales transcurridos en la sesión (descontando pausas) */
+function totalElapsedSec(){
+  if(!W) return 0;
+  const now = W.paused ? W.pausedAt : Date.now();
+  const ms = now - W.totalStart - W.totalPauseAccum;
+  return Math.max(0, Math.floor(ms/1000));
+}
+
+function tick(){
+  if(!W || W.paused) return;
+
+  // ¿Ha vencido la fase actual? Puede haber vencido varias si estuvo dormido.
+  let safety = 0;
+  while(W && !W.paused && segElapsedSec() >= W.segments[W.currentSeg].t && safety < 50){
+    const seg = W.segments[W.currentSeg];
+    // Guardar duración real de esa fase (para stats)
+    W.segmentsDone.push({ p: seg.p, t: seg.t });
+    // Avanzar fase manteniendo sincronía con reloj real
+    const segEndTs = W.segStartTs + (seg.t * 1000) + W.pauseAccum;
+    W.currentSeg++;
+    if(W.currentSeg >= W.segments.length){
+      // Sesión terminada
+      endWorkout(false);
+      return;
+    }
+    // La nueva fase empieza cuando la anterior debería haber terminado
+    W.segStartTs = segEndTs;
+    W.pauseAccum = 0;
+    W.warned = false;
+    announcePhase(W.currentSeg, false);
+    safety++;
+  }
+
+  if(!W) return;
+
+  // Aviso 10s antes del cambio
+  const seg = W.segments[W.currentSeg];
+  const remaining = seg.t - segElapsedSec();
+  if(S.settings.warn && !W.warned && remaining === 10 && W.currentSeg < W.segments.length-1){
+    const next = W.segments[W.currentSeg+1];
+    if(next.p === 'run'){ notifyPre('Prepárate. En diez segundos, a correr.'); }
+    else if(next.p === 'walk'){ notifyPre('Muy bien. En diez segundos, a caminar.'); }
+    else if(next.p === 'cooldown'){ notifyPre('Último tramo. En diez segundos, vuelta a la calma.'); }
+    W.warned = true;
+  }
+
+  updateWorkoutUI();
+}
+
+function updateWorkoutUI(){
+  if(!W) return;
+  const seg = W.segments[W.currentSeg];
+  const lbl = phaseLabels[seg.p];
+  const phaseEl = document.getElementById('w-phase');
+  phaseEl.textContent = lbl.label;
+  phaseEl.className = 'w-phase '+seg.p;
+  document.getElementById('w-instruction').textContent = lbl.instr;
+  document.getElementById('w-ring').className = 'w-ring '+seg.p;
+
+  const remaining = seg.t - segElapsedSec();
+  document.getElementById('w-time').textContent = fmtTime(Math.max(0,remaining));
+  document.getElementById('w-seglabel').textContent = lbl.label;
+  document.getElementById('w-total').textContent = fmtTime(totalElapsedSec());
+  document.getElementById('w-idx').textContent = W.currentSeg+1;
+
+  // Círculo de progreso
+  const ringLen = 2*Math.PI*90;
+  const pct = Math.min(1, segElapsedSec() / seg.t);
+  document.getElementById('ring-prog').setAttribute('stroke-dashoffset', ringLen*(1-pct));
+
+  // Barra total
+  document.getElementById('w-progbar').style.width = Math.min(100,(totalElapsedSec()/W.totalTarget*100))+'%';
+
+  // GPS
+  if(W.gpsActive){
+    const km = W.distanceM / 1000;
+    document.getElementById('w-km').textContent = km.toFixed(2);
+    // Ritmo medio min/km sobre el tiempo total de la sesión
+    const tot = totalElapsedSec();
+    if(km > 0.05 && tot > 0){
+      const pace = (tot/60) / km; // min/km
+      const pMin = Math.floor(pace);
+      const pSec = Math.round((pace - pMin)*60);
+      document.getElementById('w-pace').textContent = pMin+':'+String(pSec).padStart(2,'0');
+    } else {
+      document.getElementById('w-pace').textContent = '—';
+    }
+  }
+}
+
+function togglePause(){
+  if(!W) return;
+  if(!W.paused){
+    W.paused = true;
+    W.pausedAt = Date.now();
+  } else {
+    const pauseDuration = Date.now() - W.pausedAt;
+    W.pauseAccum += pauseDuration;
+    W.totalPauseAccum += pauseDuration;
+    W.pausedAt = null;
+    W.paused = false;
+  }
+  document.getElementById('w-pause').textContent = W.paused ? 'Reanudar' : 'Pausar';
+  const mode = S.settings.mode || 'voice';
+  if(mode === 'beep'){
+    beep(W.paused ? 440 : 660, 150, 0.4);
+  } else {
+    if(W.paused) speakVoice('Pausado');
+    else speakVoice('Continuamos');
+  }
+}
+
+function skipPhase(){
+  if(!W) return;
+  if(!confirm('¿Saltar a la siguiente fase?')) return;
+  const seg = W.segments[W.currentSeg];
+  W.segmentsDone.push({ p: seg.p, t: segElapsedSec() });
+  W.currentSeg++;
+  W.segStartTs = Date.now();
+  W.pauseAccum = 0;
+  W.warned = false;
+  if(W.currentSeg >= W.segments.length){
+    endWorkout(false);
+    return;
+  }
+  announcePhase(W.currentSeg, false);
+  updateWorkoutUI();
+}
+
+function confirmStop(){
+  if(!W) return;
+  if(totalElapsedSec() < 30){
+    endWorkout(true);
+    return;
+  }
+  document.getElementById('modal-stop').classList.add('active');
+}
+
+function endWorkout(partial){
+  if(!W) return;
+  closeModal('modal-stop');
+  clearInterval(timerId);
+  timerId = null;
+  releaseWakeLock();
+  stopSilentKeepalive();
+  stopGPS();
+  destroyMiniMap();
+  try{ speechSynthesis.cancel(); }catch(e){}
+  stopDuck();
+
+  const completedFull = W.currentSeg >= W.segments.length;
+  const totalElapsed = totalElapsedSec();
+  const didMoreThanHalf = totalElapsed >= W.totalTarget * 0.5;
+  const save = completedFull || didMoreThanHalf;
+
+  // Calcular tiempo corrido real a partir de segmentsDone + fase actual en curso
+  let runSec = 0;
+  W.segmentsDone.forEach(s=>{ if(s.p==='run') runSec += s.t; });
+  if(!completedFull && W.currentSeg < W.segments.length && W.segments[W.currentSeg].p==='run'){
+    runSec += segElapsedSec();
+  }
+
+  if(save){
+    // Simplificar track: si hay >200 puntos, decimar por media
+    let track = W.gpsTrack.length > 0 ? W.gpsTrack.slice() : null;
+    if(track && track.length > 200){
+      const step = Math.ceil(track.length / 200);
+      const decimated = [];
+      for(let i=0; i<track.length; i+=step){ decimated.push(track[i]); }
+      // Añadir siempre el último punto
+      if(decimated[decimated.length-1] !== track[track.length-1]){
+        decimated.push(track[track.length-1]);
+      }
+      track = decimated;
+    }
+    // Redondear a 6 decimales (~10cm, más que suficiente) para ahorrar espacio
+    if(track){
+      track = track.map(([lat,lon])=>[Math.round(lat*1e6)/1e6, Math.round(lon*1e6)/1e6]);
+    }
+    S.sessions.push({
+      date: new Date().toISOString(),
+      week: W.weekIdx+1,
+      session: S.sessionsInWeek+1,
+      totalSec: totalElapsed,
+      runSec,
+      distanceM: Math.round(W.distanceM),
+      track,
+      completed: completedFull
+    });
+    if(completedFull){
+      S.sessionsInWeek++;
+      if(S.sessionsInWeek >= 3 && S.currentWeek < PLAN.length-1){
+        S.currentWeek++;
+        S.sessionsInWeek = 0;
+      } else if(S.sessionsInWeek > 3){
+        S.sessionsInWeek = 3;
+      }
+    }
+    saveState();
+  }
+
+  // Modal de fin
+  if(completedFull){
+    const mode = S.settings.mode || 'voice';
+    if(mode === 'beep'){ beepPattern('done'); }
+    else if(mode === 'both'){ beepPattern('done'); setTimeout(()=>speakVoice('¡Enhorabuena! Sesión completada.'), 800); }
+    else { speakVoice('¡Enhorabuena! Sesión completada.'); }
+    vibrate([200,100,200,100,400]);
+    document.getElementById('m-title').textContent = '¡Sesión completada!';
+    document.getElementById('m-subtitle').textContent = '¡Bien hecho! Has terminado la sesión entera.';
+  } else if(save){
+    document.getElementById('m-title').textContent = 'Sesión parcial guardada';
+    document.getElementById('m-subtitle').textContent = 'No has terminado, pero se guarda igual en tu progreso.';
+  } else {
+    document.getElementById('m-title').textContent = 'Sesión no guardada';
+    document.getElementById('m-subtitle').textContent = 'Llevabas muy poco tiempo, no se registra.';
+  }
+  document.getElementById('m-time').textContent = fmtTime(totalElapsed);
+  document.getElementById('m-run').textContent = fmtTime(runSec);
+  // Mostrar distancia en el modal si había GPS
+  const mKm = document.getElementById('m-km-row');
+  if(W.gpsActive && W.distanceM > 0){
+    mKm.style.display = '';
+    document.getElementById('m-km').textContent = (W.distanceM/1000).toFixed(2)+' km';
+  } else {
+    mKm.style.display = 'none';
+  }
+
+  document.getElementById('workout').classList.remove('active');
+  document.getElementById('w-pause').textContent = 'Pausar';
+  document.getElementById('modal-finish').classList.add('active');
+  W = null;
+  renderAll();
+}
+
+/* =========================================================
+   GPS - seguimiento de distancia
+========================================================= */
+function startGPS(){
+  if(!('geolocation' in navigator)) return;
+  if(!W || W.gpsWatchId !== null) return;
+  try{
+    W.gpsWatchId = navigator.geolocation.watchPosition(
+      (pos)=>{
+        if(!W) return;
+        const { latitude:lat, longitude:lon, accuracy } = pos.coords;
+        // Descartar posiciones con mala precisión (>50m)
+        if(accuracy > 50) return;
+        if(W.lastPos){
+          const d = haversine(W.lastPos.lat, W.lastPos.lon, lat, lon);
+          const dt = (Date.now() - W.lastPos.ts)/1000;
+          const speed = dt>0 ? d/dt : 0;
+          if(speed < 8){ // filtro de saltos imposibles
+            if(!W.paused) W.distanceM += d;
+          }
+        }
+        W.lastPos = { lat, lon, ts: Date.now() };
+        W.gpsPoints++;
+        // Añadir al track y actualizar mapa
+        W.gpsTrack.push([lat, lon]);
+        updateMiniMap();
+      },
+      (err)=>{ console.warn('GPS err', err); },
+      { enableHighAccuracy:true, maximumAge:2000, timeout:15000 }
+    );
+  }catch(e){ console.warn(e); }
+}
+function stopGPS(){
+  if(W && W.gpsWatchId !== null){
+    try{ navigator.geolocation.clearWatch(W.gpsWatchId); }catch(e){}
+    W.gpsWatchId = null;
+  }
+}
+/* Fórmula Haversine: distancia entre dos coordenadas en metros */
+function haversine(lat1, lon1, lat2, lon2){
+  const R = 6371000;
+  const toRad = x => x*Math.PI/180;
+  const dLat = toRad(lat2-lat1);
+  const dLon = toRad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+/* =========================================================
+   MAPA DE RUTA (Leaflet)
+========================================================= */
+function initMiniMap(){
+  if(typeof L === 'undefined') return;
+  if(!W) return;
+  try{
+    const el = document.getElementById('w-map');
+    el.innerHTML = '';
+    const map = L.map(el, {
+      zoomControl:false,
+      attributionControl:true,
+      dragging:true,
+      scrollWheelZoom:false,
+      doubleClickZoom:false,
+      boxZoom:false,
+      tap:true,
+    }).setView([39.5696, 2.6502], 14); // Mallorca por defecto hasta que llegue la 1ª posición
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'© OSM',
+      maxZoom:19,
+    }).addTo(map);
+    W.map = map;
+    W.mapLine = L.polyline([], { color:'#b96e4e', weight:4, opacity:.85 }).addTo(map);
+    // Refresco tras abrir para que Leaflet recalcule tamaño
+    setTimeout(()=>{ try{ map.invalidateSize(); }catch(e){} }, 300);
+  }catch(e){ console.warn(e); }
+}
+function updateMiniMap(){
+  if(!W || !W.map || !W.mapLine) return;
+  const track = W.gpsTrack;
+  if(track.length === 0) return;
+  W.mapLine.setLatLngs(track);
+  const last = track[track.length-1];
+  // Marcador de posición actual
+  if(!W.mapMarker){
+    W.mapMarker = L.circleMarker(last, {
+      radius:7, color:'#faf6ec', weight:2,
+      fillColor:'#b96e4e', fillOpacity:1
+    }).addTo(W.map);
+  } else {
+    W.mapMarker.setLatLng(last);
+  }
+  // Auto-seguir al corredor: centra en la posición actual sin hacer zoom excesivo
+  if(track.length === 1){
+    W.map.setView(last, 17);
+  } else if(track.length % 5 === 0){
+    // Cada 5 puntos, reajusta ligeramente para que quede centrado
+    W.map.panTo(last, { animate:true, duration:0.5 });
+  }
+}
+function destroyMiniMap(){
+  if(W && W.map){
+    try{ W.map.remove(); }catch(e){}
+    W.map = null; W.mapLine = null; W.mapMarker = null;
+  }
+}
+
+/* Mapa del historial - modal de ruta */
+let routeMapInstance = null;
+function openRouteModal(sessionIndex){
+  const s = S.sessions[sessionIndex];
+  if(!s) return;
+  if(!s.track || s.track.length < 2){
+    alert('Esta sesión no tiene datos de ruta guardados.');
+    return;
+  }
+  const d = new Date(s.date);
+  const day = d.getDate();
+  const mo = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][d.getMonth()];
+  document.getElementById('mr-title').textContent = `Semana ${s.week} · Sesión ${s.session}`;
+  document.getElementById('mr-subtitle').textContent = `${day} de ${mo} · ${PLAN[s.week-1]?.sub || ''}`;
+  document.getElementById('mr-time').textContent = fmtTime(s.totalSec);
+  document.getElementById('mr-km').textContent = ((s.distanceM||0)/1000).toFixed(2)+' km';
+  document.getElementById('modal-route').classList.add('active');
+
+  // Crear mapa (esperar a que el modal sea visible)
+  setTimeout(()=>{
+    try{
+      if(routeMapInstance){ routeMapInstance.remove(); routeMapInstance = null; }
+      const el = document.getElementById('mr-map');
+      el.innerHTML = '';
+      routeMapInstance = L.map(el, {
+        zoomControl:true, scrollWheelZoom:true,
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution:'© OpenStreetMap', maxZoom:19,
+      }).addTo(routeMapInstance);
+      const line = L.polyline(s.track, { color:'#b96e4e', weight:4, opacity:.9 }).addTo(routeMapInstance);
+      // Marcadores de inicio y fin
+      L.circleMarker(s.track[0], {
+        radius:8, color:'#faf6ec', weight:2,
+        fillColor:'#7a9b7c', fillOpacity:1
+      }).addTo(routeMapInstance).bindPopup('Inicio');
+      L.circleMarker(s.track[s.track.length-1], {
+        radius:8, color:'#faf6ec', weight:2,
+        fillColor:'#b96e4e', fillOpacity:1
+      }).addTo(routeMapInstance).bindPopup('Fin');
+      routeMapInstance.fitBounds(line.getBounds(), { padding:[20,20] });
+      setTimeout(()=>{ try{ routeMapInstance.invalidateSize(); }catch(e){} }, 300);
+    }catch(e){ console.warn(e); }
+  }, 150);
+}
+
+function announcePhase(segIdx, isFirst){
+  const seg = W.segments[segIdx];
+  const lbl = phaseLabels[seg.p];
+  let text;
+  if(isFirst){
+    text = lbl.voice;
+  } else {
+    const mins = Math.floor(seg.t/60), secs = seg.t%60;
+    let durTxt = '';
+    if(mins>0 && secs===0) durTxt = mins+' minuto'+(mins>1?'s':'');
+    else if(mins===0) durTxt = secs+' segundos';
+    else durTxt = mins+' minuto'+(mins>1?'s':'')+' y '+secs+' segundos';
+
+    if(seg.p === 'run') text = '¡Ahora a correr! '+durTxt+'.';
+    else if(seg.p === 'walk') text = 'Caminando '+durTxt+'. Recupera.';
+    else if(seg.p === 'cooldown') text = 'Vuelta a la calma. Cinco minutos caminando.';
+    else text = lbl.voice;
+  }
+  notifyPhase(seg.p, text);
+  // Vibración
+  if(seg.p === 'run') vibrate([200,100,200]);
+  else if(seg.p === 'walk') vibrate([200]);
+  else if(seg.p === 'cooldown') vibrate([200,100,200,100,200]);
+}
+
+function closeModal(id){
+  document.getElementById(id).classList.remove('active');
+}
+
+/* =========================================================
+   NAVEGACIÓN TABS
+========================================================= */
+document.querySelectorAll('nav.tabs button').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById('view-'+b.dataset.view).classList.add('active');
+    if(b.dataset.view==='progress') renderProgress();
+    if(b.dataset.view==='plan') renderPlan();
+    if(b.dataset.view==='settings') renderSettings();
+    if(b.dataset.view==='today') renderToday();
+  });
+});
+
+document.getElementById('btn-start').addEventListener('click', startWorkout);
+
+/* =========================================================
+   INICIO
+========================================================= */
+function renderAll(){
+  renderToday();
+  renderPlan();
+  renderProgress();
+  renderSettings();
+}
+renderAll();
+
+// Re-adquirir wake lock si el usuario vuelve a la app
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'visible' && W){
+    requestWakeLock();
+    // Disparar un tick inmediato para recalcular dónde estamos
+    tick();
+  }
+});
+
+// Warm-up de audio en el primer tap (requisito iOS)
+document.addEventListener('click', ()=>{
+  if(!voicesLoaded) pickVoice();
+  // Despertar AudioContext
+  getAudioCtx();
+  // Un mute utterance para desbloquear TTS en iOS
+  if('speechSynthesis' in window){
+    try{
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+},{ once:true });
+</script>
+</body>
+</html>
