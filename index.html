@@ -302,6 +302,20 @@
     font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;
     text-transform:uppercase;cursor:pointer;
   }
+  .manage-row{
+    display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;
+    padding:10px 0;border-bottom:1px solid var(--line);
+  }
+  .manage-row:last-child{border-bottom:0}
+  .manage-row .info{font-size:13px;line-height:1.4}
+  .manage-row .info .mini{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-dim);display:block;margin-top:2px}
+  .manage-row .info .badges{display:flex;gap:5px;margin-top:4px;flex-wrap:wrap}
+  .del-btn{
+    background:none;border:1px solid rgba(184,84,80,.3);color:#b85450;
+    width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;
+    flex-shrink:0;display:flex;align-items:center;justify-content:center;
+  }
+  .del-btn:active{background:rgba(184,84,80,.1)}
   .info-box{
     background:rgba(122,155,124,.08);border-left:2px solid var(--walk);
     padding:14px 16px;border-radius:0 10px 10px 0;font-size:13px;
@@ -618,6 +632,13 @@
         <div class="lbl">Retroceder semana <span class="mini">Si la actual cuesta mucho</span></div>
         <button class="mini-btn" onclick="previousWeek()">Retroceder</button>
       </div>
+
+      <div style="margin-top:18px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.25em;color:var(--warm);text-transform:uppercase;margin-bottom:10px">Gestionar sesiones</div>
+        <div class="info-box" style="margin-bottom:10px">Pulsa la <b>✕</b> de cualquier sesión para borrarla del historial. El progreso de semanas se recalcula automáticamente.</div>
+        <div id="manage-sessions-list"></div>
+      </div>
+
       <button class="danger-btn" onclick="resetAll()">Reiniciar todo el progreso</button>
     </div>
 
@@ -1206,6 +1227,7 @@ function renderSettings(){
       saveState();
     };
   });
+  renderManageSessions();
 }
 function exportData(){
   const blob = new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
@@ -1240,6 +1262,73 @@ function markManualDone(){
   }
   saveState();
   renderAll();
+}
+
+function renderManageSessions(){
+  const list = document.getElementById('manage-sessions-list');
+  if(!list) return;
+  if(S.sessions.length === 0){
+    list.innerHTML = '<div style="color:var(--ink-dim);font-size:13px;font-style:italic;padding:10px 0">No hay sesiones registradas.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  // Mostrar todas, más reciente primero, con su índice real
+  const indexed = S.sessions.map((s,i)=>({s,i})).reverse();
+  indexed.forEach(({s,i})=>{
+    const d = new Date(s.date);
+    const day = d.getDate();
+    const mo = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][d.getMonth()];
+    const hour = d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');
+    const kmTxt = (s.distanceM && s.distanceM>50) ? `${(s.distanceM/1000).toFixed(2)} km · ` : '';
+    const badges = [];
+    if(s.manual) badges.push(`<span class="manual-badge">manual</span>`);
+    if(s.track && s.track.length>1) badges.push(`<span class="map-badge">GPS</span>`);
+    if(!s.completed) badges.push(`<span class="manual-badge">parcial</span>`);
+    const row = document.createElement('div');
+    row.className = 'manage-row';
+    row.innerHTML = `
+      <div class="info">
+        <b>S${s.week}·${s.session} — ${day} ${mo} ${hour}</b>
+        <span class="mini">${kmTxt}${fmtTime(s.totalSec)} total</span>
+        ${badges.length ? `<div class="badges">${badges.join('')}</div>` : ''}
+      </div>
+      <button class="del-btn" title="Borrar sesión" onclick="deleteSession(${i})">✕</button>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function deleteSession(idx){
+  const s = S.sessions[idx];
+  if(!s) return;
+  const d = new Date(s.date);
+  const mo = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][d.getMonth()];
+  if(!confirm(`¿Borrar la sesión del ${d.getDate()} de ${mo}?\n(Semana ${s.week}, Sesión ${s.session})`)) return;
+  S.sessions.splice(idx, 1);
+  // Recalcular semana y sesión actuales desde cero
+  recalcWeekProgress();
+  saveState();
+  renderAll();
+  renderManageSessions();
+}
+
+/* Recalcula currentWeek y sessionsInWeek contando
+   las sesiones completadas que quedan en el historial.
+   Así al borrar sesiones el progreso se ajusta solo. */
+function recalcWeekProgress(){
+  // Contar completadas por semana
+  const counts = {};
+  S.sessions.filter(s=>s.completed).forEach(s=>{
+    counts[s.week] = (counts[s.week]||0)+1;
+  });
+  // La semana actual es la primera que no tiene 3 sesiones completadas
+  let week = 0;
+  for(let w=1; w<=12; w++){
+    if((counts[w]||0) >= 3){ week = w; }
+    else { week = w-1; break; }
+  }
+  S.currentWeek = Math.max(0, week);
+  S.sessionsInWeek = Math.min(3, counts[S.currentWeek+1]||0);
 }
 
 function advanceWeek(){
