@@ -883,37 +883,39 @@ function getAudioCtx(){
 }
 
 /* Pitido único. freq Hz, duración ms, volumen 0-1 */
-function beep(freq=880, durMs=180, vol=0.6){
+function beep(freq=880, durMs=180, vol=0.85){
   const ctx = getAudioCtx();
   if(!ctx) return;
   const osc = ctx.createOscillator();
   const g = ctx.createGain();
   osc.type = 'sine';
   osc.frequency.value = freq;
-  // Envelope suave para no "clicar"
   const t0 = ctx.currentTime;
   g.gain.setValueAtTime(0, t0);
-  g.gain.linearRampToValueAtTime(vol, t0+0.015);
-  g.gain.linearRampToValueAtTime(vol, t0 + durMs/1000 - 0.03);
+  g.gain.linearRampToValueAtTime(vol, t0+0.012);
+  g.gain.linearRampToValueAtTime(vol, t0 + durMs/1000 - 0.025);
   g.gain.linearRampToValueAtTime(0, t0 + durMs/1000);
   osc.connect(g).connect(ctx.destination);
   osc.start(t0);
   osc.stop(t0 + durMs/1000 + 0.01);
 }
 
-/* Reproduce N pitidos separados. Claves:
-   1 = andar (tono medio-grave, verde)
-   2 = correr (tono medio-agudo)
-   3 = vuelta a la calma (descendente) */
+/* Pitido de arranque antes de la voz: abre el canal de audio
+   a volumen alto para que el sistema no la baje */
+function primeAudioChannel(){
+  beep(1, 50, 0.001); // inaudible pero activa el canal
+}
+
+/* Reproduce N pitidos separados */
 function beepPattern(kind){
   const ctx = getAudioCtx();
   if(!ctx) return;
-  if(kind === 'walk')       { beep(660, 250, 0.55); }
-  else if(kind === 'run')   { beep(880, 200, 0.6); setTimeout(()=>beep(880,200,0.6), 280); }
-  else if(kind === 'warmup'){ beep(550, 250, 0.55); }
-  else if(kind === 'cooldown'){ beep(700,200,0.55); setTimeout(()=>beep(560,200,0.55),260); setTimeout(()=>beep(440,280,0.55),520); }
-  else if(kind === 'pre')   { beep(1000, 90, 0.4); setTimeout(()=>beep(1000,90,0.4),140); }
-  else if(kind === 'done')  { beep(660,180,0.5); setTimeout(()=>beep(880,180,0.5),200); setTimeout(()=>beep(1100,400,0.5),400); }
+  if(kind === 'walk')     { beep(600, 280, 0.85); }
+  else if(kind === 'run') { beep(900, 220, 0.9); setTimeout(()=>beep(900,220,0.9), 300); }
+  else if(kind === 'warmup'){ beep(520, 280, 0.8); }
+  else if(kind === 'cooldown'){ beep(700,220,0.8); setTimeout(()=>beep(560,220,0.8),280); setTimeout(()=>beep(420,300,0.8),560); }
+  else if(kind === 'pre') { beep(1100, 100, 0.7); setTimeout(()=>beep(1100,100,0.7),160); }
+  else if(kind === 'done'){ beep(660,200,0.8); setTimeout(()=>beep(880,200,0.8),220); setTimeout(()=>beep(1100,420,0.85),440); }
 }
 
 /* Ducking: tono silencioso continuo mientras la voz habla,
@@ -965,21 +967,36 @@ if(typeof window !== 'undefined'){
   }
 }
 
-function speakVoice(text){
+function speakVoice(text, retries=2){
   if(!('speechSynthesis' in window)) return;
   try{
     speechSynthesis.cancel();
-    // Activa ducking ANTES de empezar a hablar
+    primeAudioChannel();   // abre el canal antes de hablar
     startDuck();
     const u = new SpeechSynthesisUtterance(text);
     if(esVoice) u.voice = esVoice;
     u.lang = 'es-ES';
-    u.rate = 1.0;
+    u.rate = 0.95;         // ligeramente más lento = más claro
     u.pitch = 1.0;
     u.volume = 1.0;
-    u.onend = ()=> setTimeout(stopDuck, 400);  // pequeño margen tras la locución
-    u.onerror = ()=> stopDuck();
+    let spoken = false;
+    u.onstart = ()=>{ spoken = true; };
+    u.onend = ()=>{ setTimeout(stopDuck, 400); };
+    u.onerror = (e)=>{
+      stopDuck();
+      // Si fue interrumpido por toque de pantalla (interrupted) y quedan reintentos
+      if(retries > 0 && (e.error === 'interrupted' || e.error === 'canceled')){
+        setTimeout(()=> speakVoice(text, retries-1), 350);
+      }
+    };
     speechSynthesis.speak(u);
+    // Watchdog: si en 800ms no ha empezado (bug iOS Safari), reintentar
+    setTimeout(()=>{
+      if(!spoken && retries > 0){
+        try{ speechSynthesis.cancel(); }catch(e){}
+        setTimeout(()=> speakVoice(text, retries-1), 200);
+      }
+    }, 800);
   }catch(e){ stopDuck(); console.warn(e); }
 }
 
@@ -1452,7 +1469,7 @@ function startWorkout(){
   updateWorkoutUI();
 
   // Tick rápido para UI fluida; el tiempo real sale siempre de Date.now()
-  timerId = setInterval(tick, 500);
+  timerId = setInterval(tick, 250);
 }
 
 async function requestWakeLock(){
@@ -1509,10 +1526,10 @@ function tick(){
 
   if(!W) return;
 
-  // Aviso 10s antes del cambio
+  // Aviso 10s antes del cambio — ventana de 10-11s para no perder el tick
   const seg = W.segments[W.currentSeg];
   const remaining = seg.t - segElapsedSec();
-  if(S.settings.warn && !W.warned && remaining === 10 && W.currentSeg < W.segments.length-1){
+  if(S.settings.warn && !W.warned && remaining >= 10 && remaining <= 11 && W.currentSeg < W.segments.length-1){
     const next = W.segments[W.currentSeg+1];
     if(next.p === 'run'){ notifyPre('Prepárate. En diez segundos, a correr.'); }
     else if(next.p === 'walk'){ notifyPre('Muy bien. En diez segundos, a caminar.'); }
@@ -1535,7 +1552,12 @@ function updateWorkoutUI(){
 
   const remaining = seg.t - segElapsedSec();
   document.getElementById('w-time').textContent = fmtTime(Math.max(0,remaining));
-  document.getElementById('w-seglabel').textContent = lbl.label;
+  // Label: si es run o walk, mostrar serie
+  const serie = getSerieInfo(W.currentSeg);
+  const segLbl = serie
+    ? `${lbl.label} · ${serie.count}/${serie.total}`
+    : lbl.label;
+  document.getElementById('w-seglabel').textContent = segLbl;
   document.getElementById('w-total').textContent = fmtTime(totalElapsedSec());
   document.getElementById('w-idx').textContent = W.currentSeg+1;
 
@@ -1861,9 +1883,27 @@ function openRouteModal(sessionIndex){
   }, 150);
 }
 
+function getSerieInfo(segIdx){
+  // Cuenta cuántas veces ha aparecido este tipo de fase hasta segIdx (inclusive)
+  // y cuántas en total en la sesión (sin contar warmup/cooldown)
+  const segs = W.segments;
+  const phase = segs[segIdx].p;
+  if(phase !== 'run' && phase !== 'walk') return null;
+  let count = 0, total = 0;
+  for(let i=0; i<segs.length; i++){
+    if(segs[i].p === phase){
+      total++;
+      if(i <= segIdx) count++;
+    }
+  }
+  return { count, total };
+}
+
 function announcePhase(segIdx, isFirst){
   const seg = W.segments[segIdx];
   const lbl = phaseLabels[seg.p];
+  const serie = getSerieInfo(segIdx);
+
   let text;
   if(isFirst){
     text = lbl.voice;
@@ -1874,10 +1914,26 @@ function announcePhase(segIdx, isFirst){
     else if(mins===0) durTxt = secs+' segundos';
     else durTxt = mins+' minuto'+(mins>1?'s':'')+' y '+secs+' segundos';
 
-    if(seg.p === 'run') text = '¡Ahora a correr! '+durTxt+'.';
-    else if(seg.p === 'walk') text = 'Caminando '+durTxt+'. Recupera.';
-    else if(seg.p === 'cooldown') text = 'Vuelta a la calma. Cinco minutos caminando.';
-    else text = lbl.voice;
+    // Número ordinal para la serie
+    const ordinal = ['primera','segunda','tercera','cuarta','quinta',
+                     'sexta','séptima','octava','novena','décima',
+                     'undécima','duodécima'];
+
+    if(seg.p === 'run'){
+      const ord = serie && serie.count <= ordinal.length ? ordinal[serie.count-1] : serie?.count+'ª';
+      const totalStr = serie ? ' de '+serie.total : '';
+      text = `¡A correr! ${ord} serie${totalStr}. ${durTxt}.`;
+    } else if(seg.p === 'walk'){
+      if(serie && serie.count < serie.total){
+        text = `Caminando ${durTxt}. Serie ${serie.count} completada.`;
+      } else {
+        text = `Última caminata. ${durTxt}. Casi lo tienes.`;
+      }
+    } else if(seg.p === 'cooldown'){
+      text = 'Vuelta a la calma. Cinco minutos caminando. ¡Lo has hecho muy bien!';
+    } else {
+      text = lbl.voice;
+    }
   }
   notifyPhase(seg.p, text);
   // Vibración
