@@ -166,6 +166,16 @@
   }
   .manual-btn:active{background:rgba(46,46,46,.04)}
   .manual-btn.done{display:none}
+  .postpone-btn{
+    display:block;width:100%;margin-top:8px;
+    background:transparent;color:var(--ink-dim);
+    border:1px dashed var(--line-2);padding:11px;border-radius:14px;
+    font-family:'JetBrains Mono',monospace;font-size:10px;
+    letter-spacing:.15em;text-transform:uppercase;cursor:pointer;
+    transition:color .2s,border-color .2s;opacity:.7;
+  }
+  .postpone-btn:active{background:rgba(46,46,46,.04)}
+  .postpone-btn.hidden{display:none}
 
   .tips{
     margin-top:22px;padding:16px 18px;
@@ -514,6 +524,7 @@
 
       <button class="start-btn" id="btn-start">Empezar sesión</button>
       <button class="manual-btn" id="btn-manual" onclick="markManualDone()">Ya la hice · marcar como completada</button>
+      <button class="postpone-btn" id="btn-postpone" onclick="postponeWeek()">Esta semana no pude · pasar a la siguiente</button>
     </div>
 
     <div class="tips">
@@ -1089,13 +1100,17 @@ function renderToday(){
   b.textContent = 'Empezar sesión';
   b.classList.remove('done');
   bm.classList.remove('done');
+  const bp = document.getElementById('btn-postpone');
   if(idx === PLAN.length-1 && S.sessionsInWeek>=3){
     b.textContent = '¡Plan completado!';
     b.classList.add('done');
     bm.classList.add('done');
+    if(bp) bp.classList.add('hidden');
   } else if(S.sessionsInWeek >= 3){
-    // Semana completa, esperando pasar a la siguiente (ya lo habrá hecho automáticamente)
     bm.classList.add('done');
+    if(bp) bp.classList.add('hidden');
+  } else {
+    if(bp) bp.classList.remove('hidden');
   }
 }
 
@@ -1346,6 +1361,17 @@ function recalcWeekProgress(){
   }
   S.currentWeek = Math.max(0, week);
   S.sessionsInWeek = Math.min(3, counts[S.currentWeek+1]||0);
+}
+
+function postponeWeek(){
+  if(S.currentWeek >= PLAN.length-1) return;
+  S.currentWeek++;
+  S.sessionsInWeek = 0;
+  saveState();
+  renderAll();
+  // Mostrar notificación suave
+  const tag = document.getElementById('today-week');
+  if(tag){ const prev = tag.textContent; tag.textContent = '→ Semana '+(S.currentWeek+1)+' · ¡Adelante!'; setTimeout(()=>renderToday(), 2000); }
 }
 
 function advanceWeek(){
@@ -2001,3 +2027,5 @@ document.addEventListener('click', ()=>{
 </script>
 </body>
 </html>
+
+
